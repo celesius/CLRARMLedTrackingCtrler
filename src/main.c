@@ -120,7 +120,6 @@ uint32_t CalcUsecondsFromStopwatch(uint32_t nStart, uint32_t nStop)
 void getArray(uint8_t *allData, uint16_t vDataLength, uint8_t *vData)
 {
 
-
 }
 
 unsigned char getChar(uint8_t *string){
@@ -177,43 +176,19 @@ int main(int argc, char* argv[])
 	char turnLight = 0;
 
 	while(1){
-		//blink_led_on();
-		//timer_sleep(BLINK_OFF_TICKS);
-		//blink_led_off();
-		//timer_sleep(BLINK_OFF_TICKS);
 		if(COM_INFO[COM1]->rxstatus & 0x8000){
-			//trace_printf("%d\n",COM_INFO[COM1]->rxsize);
-			//trace_printf("%s\n",COM_INFO[COM1]->rxbuf);
-			//trace_printf("len = %d\n",COM_INFO[COM1]->rxnbr);
 			uint8_t vData[100] = {0};
-			//memcpy(vData, COM_INFO[COM1]->rxbuf,COM_INFO[COM1]->rxnbr);
-			//vData[COM_INFO[COM1]->rxnbr] = '\0';
 			COM_INFO[COM1]->rxbuf[COM_INFO[COM1]->rxnbr] = '\0';
 			led_mask = (uint16_t)atoi((char *)COM_INFO[COM1]->rxbuf)&0xff;
 			//unsigned char const led_mask = getChar(COM_INFO[COM1]->rxbuf); //(unsigned char)atoi((char *)COM_INFO[COM1]->rxbuf)&0xff;
 			//trace_printf("vData    = %s\n", vData);
-			trace_printf("led_mask = 0x%x\n", led_mask); //不print  led_mask 很可能是0!!!!
-			COM_INFO[COM1]->rxstatus = 0;	//清除接收状态字
-			COM_INFO[COM1]->rxnbr = 0;// 清除接收计数
+			trace_printf("led_mask = 0x%x\n", led_mask);	//不print  led_mask 很可能是0!!!!
+			COM_INFO[COM1]->rxstatus = 0;					//清除接收状态字
+			COM_INFO[COM1]->rxnbr = 0;						// 清除接收计数
 			blink_set_tracking_led(led_mask);
-			if(turnLight){
-				turnLight = 0;
-				//blink_led_on();
-			} else {
-				turnLight = 1;
-				//blink_led_off();
-			}
-
 		} else {
 			//trace_printf("rxstatus  0x%x\n",COM_INFO[COM1]->rxstatus);
 		}
-		//char send_data[10] = {0};
-		//sprintf(send_data,"d = %d\r\n",loopNum++);
-		//for(i=0;i<10;i++){
-			//USART_SendData(USART1, send_data[i]);//串口发送一个数据
-			//while (USART_GetFlagStatus(USART1, USART_FLAG_TC) == RESET);//等待串口发送完成
-		//}
-		//return (unsigned char)USART_ReceiveData(USARTx);
 	}
 }
 #endif
@@ -227,7 +202,7 @@ int main(int argc, char* argv[])
 	blink_tracking_led_init();
 
 	while(1){
-/*
+		/*
 		blink_led_on();
 		blink_set_tracking_led(0x05);
 		timer_sleep(BLINK_OFF_TICKS);
@@ -236,7 +211,7 @@ int main(int argc, char* argv[])
 		timer_sleep(BLINK_OFF_TICKS);
 		blink_set_tracking_led(0x08);
 		timer_sleep(BLINK_OFF_TICKS);
-*/
+		 */
 		blink_set_tracking_led(0x01);
 		timer_sleep(BLINK_OFF_TICKS);
 		blink_set_tracking_led(0x02);
@@ -305,7 +280,7 @@ main(int argc, char* argv[])
 	}
 	// Infinite loop, never return.
 }
-*/
+ */
 
 #pragma GCC diagnostic pop
 

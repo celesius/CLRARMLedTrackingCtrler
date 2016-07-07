@@ -416,12 +416,12 @@ void USART1_IRQHandler(void)
 			else //»¹Ã»ÊÕµ½'\r'
 			{
 				if(data == '\r')
-					COM1_Info.rxstatus	|=	0x4000;					
+					COM1_Info.rxstatus	|=	0x4000;					//½ÓÊÕµ½»Ø³µ¼ü
 				else
 				{
 					COM1_Info.rxbuf[COM1_Info.rxnbr]	=	data ;
 					COM1_Info.rxnbr++;
-					if(COM1_Info.rxnbr	>= (COM1_Info.rxsize - 1))//
+					if(COM1_Info.rxnbr	>= (COM1_Info.rxsize - 1))//»º³åÒç³ö
 					{
 						COM1_Info.rxnbr = 0;
 						COM1_Info.rxstatus = 0;
@@ -436,3 +436,4 @@ void USART1_IRQHandler(void)
 
 #endif
 
+/********************* (C) COPYRIGHT 2014 WWW.UCORTEX.COM **********END OF FILE**********/
