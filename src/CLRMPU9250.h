@@ -11,6 +11,7 @@
 #include <stdio.h>
 #include "./i2c/CLRI2CInterface.h"
 
+#define INT_STATUS 0x3A
 class CLRMPU9250 {
 public:
 	CLRMPU9250();
@@ -23,19 +24,33 @@ public:
 	void getMres();
 	void getGres();
 	void getAres();
-
-	float magCalibration[3];
-private:
-	CLRI2CInterface *i2c;
-	void writeByte(uint8_t address, uint8_t subAddress, uint8_t data);
-	void readBytes(uint8_t address, uint8_t subAddress, uint8_t count, uint8_t * dest);
+	void calibrateMPU9250(float * dest1, float * dest2);
+	void wait(float time);
 	void readAccelData(int16_t * destination);
 	void readGyroData(int16_t * destination);
 	void readMagData(int16_t * destination);
 	int16_t readTempData();
-	void calibrateMPU9250(float * dest1, float * dest2);
+
+	float magCalibration[3];
+	float accelBias[3];
+	float gyroBias[3]; // Bias corrections for gyro and accelerometer
+	float magbias[3];  // Factory mag calibration and mag bias
+	uint8_t Ascale;
+	uint8_t Gscale;
+	uint8_t Mscale;
+	uint8_t Mmode;
+	float aRes, gRes, mRes;      // scale resolutions per LSB for the sensors
+	int16_t accelCount[3];  // Stores the 16-bit signed accelerometer sensor output
+	int16_t gyroCount[3];   // Stores the 16-bit signed gyro sensor output
+	int16_t magCount[3];    // Stores the 16-bit signed magnetometer sensor output
+	float ax, ay, az, gx, gy, gz, mx, my, mz; // variables to hold latest sensor data values
+	float q[4];           // vector to hold quaternion
+private:
+	CLRI2CInterface *i2c;
+	void writeByte(uint8_t address, uint8_t subAddress, uint8_t data);
+	void readBytes(uint8_t address, uint8_t subAddress, uint8_t count, uint8_t * dest);
 	void MPU9250SelfTest(float * destination);
-	void MahonyQuaternionUpdate(float ax, float ay, float az, float gx, float gy, float gz, float mx, float my, float mz);
+	void MahonyQuaternionUpdate(float deltat, float ax, float ay, float az, float gx, float gy, float gz, float mx, float my, float mz);
 };
 
 #endif /* CLRMPU9250_H_ */
