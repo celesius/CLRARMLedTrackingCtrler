@@ -28,6 +28,8 @@ CPP_DEPS :=
 # Every subdirectory with source files must be described here
 SUBDIRS := \
 src \
+src/common/delay \
+src/i2c \
 system/src/cmsis \
 system/src/cortexm \
 system/src/diag \
