@@ -5,12 +5,12 @@
 
 // ----------------------------------------------------------------------------
 
-extern "C" {
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
-
+#include <math.h>
+extern "C" {
 #include "stm32f10x.h"
 #include "diag/Trace.h"
 
@@ -126,6 +126,31 @@ uint32_t CalcUsecondsFromStopwatch(uint32_t nStart, uint32_t nStop)
 	return nTemp;
 }
 
+float getSecond(uint32_t nTime){
+	uint32_t nTemp;
+	uint32_t n;
+	n = SystemCoreClock / 1000000;          // Convert Hz to MHz. SystemCoreClock = 168000000
+	nTemp = nTime / n;
+	return  (float)nTemp/(1000.0*1000.0);
+}
+
+float getMs(uint32_t nTime){
+	uint32_t nTemp;
+	uint32_t n;
+	n = SystemCoreClock / 1000000;          // Convert Hz to MHz. SystemCoreClock = 168000000
+	nTemp = nTime / n;
+	return  (float)nTemp/(1000.0);
+}
+
+float getUs(uint32_t nTime){
+	uint32_t nTemp;
+	uint32_t n;
+	n = SystemCoreClock / 1000000;          // Convert Hz to MHz. SystemCoreClock = 168000000
+	nTemp = nTime / n;
+	return  (float)nTemp;
+}
+
+
 void getArray(uint8_t *allData, uint16_t vDataLength, uint8_t *vData)
 {
 
@@ -178,13 +203,42 @@ int main(int argc, char* argv[])
 	COM_INFO[COM1]->rxbuf = buff;
 
 	COM_Init(COM1, 115200);
-	uint8_t	putS[20] = "jiangbo\r\n";
+	uint8_t	putS[60] = "jiangbo\r\n";
 	//std::string *putS;// =  new std::string;  //"jiangbo";
 	int loop = 0;
 	char *loopChar;
-	char read_data = 0;
-	/*
-    while(1){
+	uint8_t read_data = 0;
+
+	float lastUpdate = 0, firstUpdate = 0, Now = 0;    // used to calculate integration interval                               // used to calculate integration interval
+
+	float sum = 0.0;
+	uint32_t sumCount = 0;
+	int delt_t = 0; // used to control display output rate
+	int count = 0;  // used to control display output rate
+	int16_t tempCount;   // Stores the real internal chip temperature in degrees Celsius
+	float temperature;
+	const float PI = 3.14159265358979323846f;
+	float pitch, yaw, roll = 0.0;
+	float deltat = 0.0f;                             // integration interval for both filter schemes
+
+	float tempTime = 0;
+	float lastTime = 0;
+	while(0){
+		//STOPWATCH_START;
+		timer_sleep(TIMER_FREQUENCY_HZ/2);
+		//STOPWATCH_STOP;
+
+		STOPWATCH_START;
+		//dd = m_nStart - tempTime;
+		//float timeDiff = CalcUsecondsFromStopwatch(m_nStart, tempTime);
+		//tempTime = m_nStart;
+		tempTime = getMs(m_nStart);
+		float timeDiff = tempTime - lastTime;
+		lastTime = tempTime;
+		//trace_printf("My function took %f seconds\n", (float)timeDiff/(1000.0*1000.0));
+		trace_printf("My function took %f seconds\n", timeDiff);
+	}
+    while(0){
 		//sprintf(loopChar,"%d\r\n",loop++);
 		//putS->append(loopChar);
 		//putS->append("\r\n");
@@ -192,17 +246,19 @@ int main(int argc, char* argv[])
 		//COM_PutStr(COM1, (uint8_t *)loopChar);
 		stopwatch_delay(SystemCoreClock);
 		//I2C_EE_BufferRead(&read_data,0x75,1);
-		i2c->read(0x75, &read_data, 1, 0);
+		i2c->read( MPU9250_ADDRESS,0x75, &read_data, 1, 0);
 		trace_printf("read = 0x%x\n", read_data);
 		read_data = 0;
 
 		trace_puts("Hello ARM World!\n");
 	}
-	 */
 
 	//t.start();
 	//lcd.init();
 	//lcd.setBrightness(0.05);
+
+#if 1
+
 	CLRMPU9250 *mpu9250 = new CLRMPU9250();
 
 	// Read the WHO_AM_I register, this is a good test of communication
@@ -213,30 +269,30 @@ int main(int argc, char* argv[])
 	if (whoami == 0x71) // WHO_AM_I should always be 0x68
 	{
 		trace_printf("MPU9250 is online...\n\r");
-		wait(1);
+		mpu9250->wait(1);
 		//lcd.clear();
 		//lcd.printString("MPU9250 OK", 0, 0);
-
 		mpu9250->resetMPU9250(); // Reset registers to default in preparation for device calibration
-		mpu9250->calibrateMPU9250(gyroBias, accelBias); // Calibrate gyro and accelerometers, load biases in bias registers
-		trace_printf("x gyro bias = %f\n\r", gyroBias[0]);
-		trace_printf("y gyro bias = %f\n\r", gyroBias[1]);
-		trace_printf("z gyro bias = %f\n\r", gyroBias[2]);
-		trace_printf("x accel bias = %f\n\r", accelBias[0]);
-		trace_printf("y accel bias = %f\n\r", accelBias[1]);
-		trace_printf("z accel bias = %f\n\r", accelBias[2]);
-		wait(2);
+		trace_printf("eeerr\n");
+		mpu9250->calibrateMPU9250(mpu9250->gyroBias, mpu9250->accelBias); // Calibrate gyro and accelerometers, load biases in bias registers
+		trace_printf("x gyro bias = %f\n", mpu9250->gyroBias[0]);
+		trace_printf("y gyro bias = %f\n", mpu9250->gyroBias[1]);
+		trace_printf("z gyro bias = %f\n", mpu9250->gyroBias[2]);
+		trace_printf("x accel bias = %f\n", mpu9250->accelBias[0]);
+		trace_printf("y accel bias = %f\n", mpu9250->accelBias[1]);
+		trace_printf("z accel bias = %f\n", mpu9250->accelBias[2]);
+		mpu9250->wait(2);
 		mpu9250->initMPU9250();
 		trace_printf("MPU9250 initialized for active data mode....\n\r"); // Initialize device for active mode read of acclerometer, gyroscope, and temperature
 		mpu9250->initAK8963(mpu9250->magCalibration);
 		trace_printf("AK8963 initialized for active data mode....\n\r"); // Initialize device for active mode read of magnetometer
-		trace_printf("Accelerometer full-scale range = %f  g\n\r", 2.0f*(float)(1<<Ascale));
-		trace_printf("Gyroscope full-scale range = %f  deg/s\n\r", 250.0f*(float)(1<<Gscale));
-		if(Mscale == 0) trace_printf("Magnetometer resolution = 14  bits\n\r");
-		if(Mscale == 1) trace_printf("Magnetometer resolution = 16  bits\n\r");
-		if(Mmode == 2) trace_printf("Magnetometer ODR = 8 Hz\n\r");
-		if(Mmode == 6) trace_printf("Magnetometer ODR = 100 Hz\n\r");
-		wait(2);
+		trace_printf("Accelerometer full-scale range = %f  g\n\r", 2.0f*(float)(1<<mpu9250->Ascale));
+		trace_printf("Gyroscope full-scale range = %f  deg/s\n\r", 250.0f*(float)(1<<mpu9250->Gscale));
+		if(mpu9250->Mscale == 0) trace_printf("Magnetometer resolution = 14  bits\n\r");
+		if(mpu9250->Mscale == 1) trace_printf("Magnetometer resolution = 16  bits\n\r");
+		if(mpu9250->Mmode == 2) trace_printf("Magnetometer ODR = 8 Hz\n\r");
+		if(mpu9250->Mmode == 6) trace_printf("Magnetometer ODR = 100 Hz\n\r");
+		mpu9250->wait(2);
 	}
 	else
 	{
@@ -254,39 +310,42 @@ int main(int argc, char* argv[])
 	mpu9250->getAres(); // Get accelerometer sensitivity
 	mpu9250->getGres(); // Get gyro sensitivity
 	mpu9250->getMres(); // Get magnetometer sensitivity
-	trace_printf("Accelerometer sensitivity is %f LSB/g \n\r", 1.0f/aRes);
-	trace_printf("Gyroscope sensitivity is %f LSB/deg/s \n\r", 1.0f/gRes);
-	trace_printf("Magnetometer sensitivity is %f LSB/G \n\r", 1.0f/mRes);
-	magbias[0] = +470.;  // User environmental x-axis correction in milliGauss, should be automatically calculated
-	magbias[1] = +120.;  // User environmental x-axis correction in milliGauss
-	magbias[2] = +125.;  // User environmental x-axis correction in milliGauss
+	trace_printf("Accelerometer sensitivity is %f LSB/g \n\r", 1.0f/mpu9250->aRes);
+	trace_printf("Gyroscope sensitivity is %f LSB/deg/s \n\r", 1.0f/mpu9250->gRes);
+	trace_printf("Magnetometer sensitivity is %f LSB/G \n\r", 1.0f/mpu9250->mRes);
+	mpu9250->magbias[0] = +470.;  // User environmental x-axis correction in milliGauss, should be automatically calculated
+	mpu9250->magbias[1] = +120.;  // User environmental x-axis correction in milliGauss
+	mpu9250->magbias[2] = +125.;  // User environmental x-axis correction in milliGauss
 
 	while(1) {
 
 		// If intPin goes high, all data registers have new data
-		if(mpu9250.readByte(MPU9250_ADDRESS, INT_STATUS) & 0x01) {  // On interrupt, check if data ready interrupt
+		if(mpu9250->readByte(MPU9250_ADDRESS, INT_STATUS) & 0x01) {  // On interrupt, check if data ready interrupt
 
-			mpu9250.readAccelData(accelCount);  // Read the x/y/z adc values
+			mpu9250->readAccelData(mpu9250->accelCount);  // Read the x/y/z adc values
 			// Now we'll calculate the accleration value into actual g's
-			ax = (float)accelCount[0]*aRes - accelBias[0];  // get actual g value, this depends on scale being set
-			ay = (float)accelCount[1]*aRes - accelBias[1];
-			az = (float)accelCount[2]*aRes - accelBias[2];
+			mpu9250->ax = (float)mpu9250->accelCount[0]*mpu9250->aRes - mpu9250->accelBias[0];  // get actual g value, this depends on scale being set
+			mpu9250->ay = (float)mpu9250->accelCount[1]*mpu9250->aRes - mpu9250->accelBias[1];
+			mpu9250->az = (float)mpu9250->accelCount[2]*mpu9250->aRes - mpu9250->accelBias[2];
 
-			mpu9250.readGyroData(gyroCount);  // Read the x/y/z adc values
+			mpu9250->readGyroData(mpu9250->gyroCount);  // Read the x/y/z adc values
 			// Calculate the gyro value into actual degrees per second
-			gx = (float)gyroCount[0]*gRes - gyroBias[0];  // get actual gyro value, this depends on scale being set
-			gy = (float)gyroCount[1]*gRes - gyroBias[1];
-			gz = (float)gyroCount[2]*gRes - gyroBias[2];
+			mpu9250->gx = (float)mpu9250->gyroCount[0]*mpu9250->gRes - mpu9250->gyroBias[0];  // get actual gyro value, this depends on scale being set
+			mpu9250->gy = (float)mpu9250->gyroCount[1]*mpu9250->gRes - mpu9250->gyroBias[1];
+			mpu9250->gz = (float)mpu9250->gyroCount[2]*mpu9250->gRes - mpu9250->gyroBias[2];
 
-			mpu9250.readMagData(magCount);  // Read the x/y/z adc values
+			mpu9250->readMagData(mpu9250->magCount);  // Read the x/y/z adc values
 			// Calculate the magnetometer values in milliGauss
 			// Include factory calibration per data sheet and user environmental corrections
-			mx = (float)magCount[0]*mRes*magCalibration[0] - magbias[0];  // get actual magnetometer value, this depends on scale being set
-			my = (float)magCount[1]*mRes*magCalibration[1] - magbias[1];
-			mz = (float)magCount[2]*mRes*magCalibration[2] - magbias[2];
+			mpu9250->mx = (float)mpu9250->magCount[0]*mpu9250->mRes*mpu9250->magCalibration[0] - mpu9250->magbias[0];  // get actual magnetometer value, this depends on scale being set
+			mpu9250->my = (float)mpu9250->magCount[1]*mpu9250->mRes*mpu9250->magCalibration[1] - mpu9250->magbias[1];
+			mpu9250->mz = (float)mpu9250->magCount[2]*mpu9250->mRes*mpu9250->magCalibration[2] - mpu9250->magbias[2];
 		}
 
-		Now = t.read_us();
+		STOPWATCH_START;
+		//Now = t.read_us();
+		Now	= getUs(m_nStart);
+
 		deltat = (float)((Now - lastUpdate)/1000000.0f) ; // set integration time by time elapsed since last filter update
 		lastUpdate = Now;
 
@@ -299,41 +358,57 @@ int main(int argc, char* argv[])
 		//   }
 
 		// Pass gyro rate as rad/s
-		mpu9250.MadgwickQuaternionUpdate(ax, ay, az, gx*PI/180.0f, gy*PI/180.0f, gz*PI/180.0f,  my,  mx, mz);
+		//trace_printf("My function took %f seconds\n", deltat);
+		mpu9250->MadgwickQuaternionUpdate(deltat, mpu9250->ax, mpu9250->ay, mpu9250->az, mpu9250->gx*PI/180.0f, mpu9250->gy*PI/180.0f, mpu9250->gz*PI/180.0f,  mpu9250->my,  mpu9250->mx, mpu9250->mz);
 		// mpu9250.MahonyQuaternionUpdate(ax, ay, az, gx*PI/180.0f, gy*PI/180.0f, gz*PI/180.0f, my, mx, mz);
 
+		yaw   = atan2(2.0f * (mpu9250->q[1] * mpu9250->q[2] + mpu9250->q[0] * mpu9250->q[3]), mpu9250->q[0] * mpu9250->q[0] + mpu9250->q[1] * mpu9250->q[1] - mpu9250->q[2] * mpu9250->q[2] - mpu9250->q[3] * mpu9250->q[3]);
+		pitch = -asin(2.0f * (mpu9250->q[1] * mpu9250->q[3] - mpu9250->q[0] * mpu9250->q[2]));
+		roll  = atan2(2.0f * (mpu9250->q[0] * mpu9250->q[1] + mpu9250->q[2] * mpu9250->q[3]), mpu9250->q[0] * mpu9250->q[0] - mpu9250->q[1] * mpu9250->q[1] - mpu9250->q[2] * mpu9250->q[2] + mpu9250->q[3] * mpu9250->q[3]);
+		pitch *= 180.0f / PI;
+		yaw   *= 180.0f / PI;
+		yaw   -= 13.8f; // Declination at Danville, California is 13 degrees 48 minutes and 47 seconds on 2014-04-04
+		roll  *= 180.0f / PI;
+
+		trace_printf("Yaw, Pitch, Roll: %f %f %f\n\r", yaw, pitch, roll);
+		sprintf((char *)putS,"%f %f %f\r\n",yaw,pitch,roll);
+		COM_PutStr(COM1, putS);
+
+		/*
 		// Serial print and/or display at 0.5 s rate independent of data rates
-		delt_t = t.read_ms() - count;
+		STOPWATCH_START;
+		int nowMs = (int)getMs(m_nStart);
+		//delt_t = t.read_ms() - count;
+		delt_t = nowMs - count;
 		if (delt_t > 500) { // update LCD once per half-second independent of read rate
 
-			pc.printf("ax = %f", 1000*ax);
-			pc.printf(" ay = %f", 1000*ay);
-			pc.printf(" az = %f  mg\n\r", 1000*az);
+			trace_printf("ax = %f", 1000*mpu9250->ax);
+			trace_printf(" ay = %f", 1000*mpu9250->ay);
+			trace_printf(" az = %f  mg\n\r", 1000*mpu9250->az);
 
-			pc.printf("gx = %f", gx);
-			pc.printf(" gy = %f", gy);
-			pc.printf(" gz = %f  deg/s\n\r", gz);
+			trace_printf("gx = %f", mpu9250->gx);
+			trace_printf(" gy = %f", mpu9250->gy);
+			trace_printf(" gz = %f  deg/s\n\r", mpu9250->gz);
 
-			pc.printf("gx = %f", mx);
-			pc.printf(" gy = %f", my);
-			pc.printf(" gz = %f  mG\n\r", mz);
+			trace_printf("gx = %f", mpu9250->mx);
+			trace_printf(" gy = %f", mpu9250->my);
+			trace_printf(" gz = %f  mG\n\r", mpu9250->mz);
 
-			tempCount = mpu9250.readTempData();  // Read the adc values
+			tempCount = mpu9250->readTempData();  // Read the adc values
 			temperature = ((float) tempCount) / 333.87f + 21.0f; // Temperature in degrees Centigrade
-			pc.printf(" temperature = %f  C\n\r", temperature);
+			trace_printf(" temperature = %f  C\n\r", temperature);
 
-			pc.printf("q0 = %f\n\r", q[0]);
-			pc.printf("q1 = %f\n\r", q[1]);
-			pc.printf("q2 = %f\n\r", q[2]);
-			pc.printf("q3 = %f\n\r", q[3]);
+			trace_printf("q0 = %f\n\r", mpu9250->q[0]);
+			trace_printf("q1 = %f\n\r", mpu9250->q[1]);
+			trace_printf("q2 = %f\n\r", mpu9250->q[2]);
+			trace_printf("q3 = %f\n\r", mpu9250->q[3]);
 
-			lcd.clear();
-			lcd.printString("MPU9250", 0, 0);
-			lcd.printString("x   y   z", 0, 1);
-			lcd.setXYAddress(0, 2); lcd.printChar((char)(1000*ax));
-			lcd.setXYAddress(20, 2); lcd.printChar((char)(1000*ay));
-			lcd.setXYAddress(40, 2); lcd.printChar((char)(1000*az)); lcd.printString("mg", 66, 2);
-
+			//lcd.clear();
+			//lcd.printString("MPU9250", 0, 0);
+			//lcd.printString("x   y   z", 0, 1);
+			//lcd.setXYAddress(0, 2); lcd.printChar((char)(1000*ax));
+			//lcd.setXYAddress(20, 2); lcd.printChar((char)(1000*ay));
+			//lcd.setXYAddress(40, 2); lcd.printChar((char)(1000*az)); lcd.printString("mg", 66, 2);
 
 			// Define output variables from updated quaternion---these are Tait-Bryan angles, commonly used in aircraft orientation.
 			// In this coordinate system, the positive z-axis is down toward Earth.
@@ -344,9 +419,9 @@ int main(int argc, char* argv[])
 			// Tait-Bryan angles as well as Euler angles are non-commutative; that is, the get the correct orientation the rotations must be
 			// applied in the correct order which for this configuration is yaw, pitch, and then roll.
 			// For more see http://en.wikipedia.org/wiki/Conversion_between_quaternions_and_Euler_angles which has additional links.
-			yaw   = atan2(2.0f * (q[1] * q[2] + q[0] * q[3]), q[0] * q[0] + q[1] * q[1] - q[2] * q[2] - q[3] * q[3]);
-			pitch = -asin(2.0f * (q[1] * q[3] - q[0] * q[2]));
-			roll  = atan2(2.0f * (q[0] * q[1] + q[2] * q[3]), q[0] * q[0] - q[1] * q[1] - q[2] * q[2] + q[3] * q[3]);
+			yaw   = atan2(2.0f * (mpu9250->q[1] * mpu9250->q[2] + mpu9250->q[0] * mpu9250->q[3]), mpu9250->q[0] * mpu9250->q[0] + mpu9250->q[1] * mpu9250->q[1] - mpu9250->q[2] * mpu9250->q[2] - mpu9250->q[3] * mpu9250->q[3]);
+			pitch = -asin(2.0f * (mpu9250->q[1] * mpu9250->q[3] - mpu9250->q[0] * mpu9250->q[2]));
+			roll  = atan2(2.0f * (mpu9250->q[0] * mpu9250->q[1] + mpu9250->q[2] * mpu9250->q[3]), mpu9250->q[0] * mpu9250->q[0] - mpu9250->q[1] * mpu9250->q[1] - mpu9250->q[2] * mpu9250->q[2] + mpu9250->q[3] * mpu9250->q[3]);
 			pitch *= 180.0f / PI;
 			yaw   *= 180.0f / PI;
 			yaw   -= 13.8f; // Declination at Danville, California is 13 degrees 48 minutes and 47 seconds on 2014-04-04
@@ -355,11 +430,14 @@ int main(int argc, char* argv[])
 			trace_printf("Yaw, Pitch, Roll: %f %f %f\n\r", yaw, pitch, roll);
 			trace_printf("average rate = %f\n\r", (float) sumCount/sum);
 
-			count = t.read_ms();
+			STOPWATCH_START;
+			count = (int)getMs(m_nStart);
 			sum = 0;
 			sumCount = 0;
 		}
+		*/
 	}
+#endif
 }
 
 //uart + led

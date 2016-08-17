@@ -5,6 +5,7 @@
  *      Author: clover
  */
 
+extern "C" {
 #include "CLRMPU9250.h"
 #include "./i2c/CLRI2CInterface.h"
 #include <math.h>
@@ -92,7 +93,6 @@
 #define INT_PIN_CFG      0x37
 #define INT_ENABLE       0x38
 #define DMP_INT_STATUS   0x39  // Check DMP interrupt
-#define INT_STATUS       0x3A
 #define ACCEL_XOUT_H     0x3B
 #define ACCEL_XOUT_L     0x3C
 #define ACCEL_YOUT_H     0x3D
@@ -158,10 +158,6 @@
 #define ZA_OFFSET_H      0x7D
 #define ZA_OFFSET_L      0x7E
 
-//time is seconds
-void wait(float time){
-	delay_ms((uint16_t)time*1000);
-}
 
 void delay(int delay_num){
 	delay_ms((uint16_t)delay_num);
@@ -196,12 +192,6 @@ enum Mscale {
 	MFS_16BITS      // 0.15 mG per LSB
 };
 
-uint8_t Ascale = AFS_2G;     // AFS_2G, AFS_4G, AFS_8G, AFS_16G
-uint8_t Gscale = GFS_250DPS; // GFS_250DPS, GFS_500DPS, GFS_1000DPS, GFS_2000DPS
-uint8_t Mscale = MFS_16BITS; // MFS_14BITS or MFS_16BITS, 14-bit or 16-bit magnetometer resolution
-uint8_t Mmode = 0x06;        // Either 8 Hz 0x02) or 100 Hz (0x06) magnetometer data ODR
-float aRes, gRes, mRes;      // scale resolutions per LSB for the sensors
-
 //Set up I2C, (SDA,SCL)
 //I2C i2c(I2C_SDA, I2C_SCL);
 
@@ -210,18 +200,8 @@ float aRes, gRes, mRes;      // scale resolutions per LSB for the sensors
 // Pin definitions
 int intPin = 12;  // These can be changed, 2 and 3 are the Arduinos ext int pins
 
-int16_t accelCount[3];  // Stores the 16-bit signed accelerometer sensor output
-int16_t gyroCount[3];   // Stores the 16-bit signed gyro sensor output
-int16_t magCount[3];    // Stores the 16-bit signed magnetometer sensor output
-float magbias[3] = {0, 0, 0};  // Factory mag calibration and mag bias
-float gyroBias[3] = {0, 0, 0}, accelBias[3] = {0, 0, 0}; // Bias corrections for gyro and accelerometer
-float ax, ay, az, gx, gy, gz, mx, my, mz; // variables to hold latest sensor data values
-int16_t tempCount;   // Stores the real internal chip temperature in degrees Celsius
-float temperature;
 float SelfTest[6];
 
-int delt_t = 0; // used to control display output rate
-int count = 0;  // used to control display output rate
 
 // parameters for 6 DoF sensor fusion calculations
 float PI = 3.14159265358979323846f;
@@ -232,10 +212,6 @@ float zeta = sqrt(3.0f / 4.0f) * GyroMeasDrift;  // compute zeta, the other free
 #define Kp 2.0f * 5.0f // these are the free parameters in the Mahony filter and fusion scheme, Kp for proportional feedback, Ki for integral
 #define Ki 0.0f
 
-float pitch, yaw, roll;
-float deltat = 0.0f;                             // integration interval for both filter schemes
-int lastUpdate = 0, firstUpdate = 0, Now = 0;    // used to calculate integration interval                               // used to calculate integration interval
-float q[4] = {1.0f, 0.0f, 0.0f, 0.0f};           // vector to hold quaternion
 float eInt[3] = {0.0f, 0.0f, 0.0f};              // vector to hold integral error for Mahony method
 
 
@@ -244,15 +220,44 @@ CLRMPU9250::CLRMPU9250() {
 	// TODO Auto-generated constructor stub
 	i2c = new CLRI2CInterface();
 	Delay_Init();
-	magCalibration[0] = 0.0;
-	magCalibration[1] = 0.0;
-	magCalibration[2] = 0.0;
-
+	q[0]= 1.0f;
+	for(int i= 0;i<3;i++){
+		magCalibration[i] = 0.0;
+		accelBias[i] = 0.0;
+		gyroBias[i] = 0.0;
+		magbias[i] = 0.0;
+		accelCount[i] = 0.0;  // Stores the 16-bit signed accelerometer sensor output
+		gyroCount[i] = 0.0;   // Stores the 16-bit signed gyro sensor output
+		magCount[i] = 0.0;    // Stores the 16-bit signed magnetometer sensor output
+		q[i+1] = 0.0;
+	}
+	Ascale = AFS_2G;     // AFS_2G, AFS_4G, AFS_8G, AFS_16G
+	Gscale = GFS_250DPS; // GFS_250DPS, GFS_500DPS, GFS_1000DPS, GFS_2000DPS
+	Mscale = MFS_16BITS; // MFS_14BITS or MFS_16BITS, 14-bit or 16-bit magnetometer resolution
+	Mmode = 0x06;        // Either 8 Hz 0x02) or 100 Hz (0x06) magnetometer data ODR
+	aRes = 0.0;
+	gRes = 0.0;
+	mRes = 0.0;      // scale resolutions per LSB for the sensors
+	ax = 0;
+	ay = 0;
+	az = 0;
+	gx = 0;
+	gy = 0;
+	gz = 0;
+	mx = 0;
+	my = 0;
+	mz = 0; // variables to hold latest sensor data values
 }
 
 CLRMPU9250::~CLRMPU9250() {
 	// TODO Auto-generated destructor stub
 }
+
+//time is seconds
+void CLRMPU9250::wait(float time){
+	delay_ms((uint16_t)time*1000);
+}
+
 
 //===================================================================================================================
 //====== Set of useful function to access acceleratio, gyroscope, and temperature data
@@ -260,29 +265,42 @@ CLRMPU9250::~CLRMPU9250() {
 
 void CLRMPU9250::writeByte(uint8_t address, uint8_t subAddress, uint8_t data)
 {
-	char data_write[2];
-	data_write[0] = subAddress;
-	data_write[1] = data;
-	i2c->write(address, data_write, 2, 0);
+	//char data_write[2];
+	//data_write[0] = subAddress;
+	//data_write[1] = data;
+	//i2c->write(address, data_write, 2, 0);
+	i2c->write(address,subAddress, &data, 1, 0);
 }
 
 char CLRMPU9250::readByte(uint8_t address, uint8_t subAddress)
 {
+	/*
 	char data[1]; // `data` will store the register data
 	char data_write[1];
 	data_write[0] = subAddress;
 	i2c->write(address, data_write, 1, 1); // no stop
 	i2c->read(address, data, 1, 0);
 	return data[0];
+	*/
+	char data[1];
+	i2c->read(address, subAddress, (uint8_t *)data, 1, 0);
+	return data[0];
 }
 
 void CLRMPU9250::readBytes(uint8_t address, uint8_t subAddress, uint8_t count, uint8_t * dest)
 {
+	/*
 	char data[14];
 	char data_write[1];
 	data_write[0] = subAddress;
 	i2c->write(address, data_write, 1, 1); // no stop
 	i2c->read(address, data, count, 0);
+	for(int ii = 0; ii < count; ii++) {
+		dest[ii] = data[ii];
+	}
+	*/
+	char data[14];
+	i2c->read(address, subAddress, (uint8_t *)data, count, 0);
 	for(int ii = 0; ii < count; ii++) {
 		dest[ii] = data[ii];
 	}
@@ -808,7 +826,7 @@ void CLRMPU9250::MadgwickQuaternionUpdate(float adelay, float ax, float ay, floa
 
 // Similar to Madgwick scheme but uses proportional and integral filtering on the error between estimated reference vectors and
 // measured ones.
-void CLRMPU9250::MahonyQuaternionUpdate(float ax, float ay, float az, float gx, float gy, float gz, float mx, float my, float mz)
+void CLRMPU9250::MahonyQuaternionUpdate(float deltat, float ax, float ay, float az, float gx, float gy, float gz, float mx, float my, float mz)
 {
 	float q1 = q[0], q2 = q[1], q3 = q[2], q4 = q[3];   // short name local variable for readability
 	float norm;
@@ -898,4 +916,5 @@ void CLRMPU9250::MahonyQuaternionUpdate(float ax, float ay, float az, float gx, 
 	q[2] = q3 * norm;
 	q[3] = q4 * norm;
 
+}
 }
