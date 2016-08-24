@@ -262,6 +262,7 @@ void initCOM1(){
 
 }
 
+#if 1
 int main(int argc, char* argv[])
 {
 	timer_start();
@@ -276,7 +277,10 @@ int main(int argc, char* argv[])
 	int16_t q[4] = {0};
 	float sendQ[4] = {0};
 	while(1){
+
+		STOPWATCH_START;
 		if(mpu->loop(q)){
+
 			//COM_PutStr(COM1, okk);
 			sendQ[0] = (float)q[0] / 16384.0f;
 			sendQ[1] = (float)q[1] / 16384.0f;
@@ -293,6 +297,10 @@ int main(int argc, char* argv[])
 //            Serial.println(q.z);
 
 			sprintf((char *)putS,"quat#%f#%f#%f#%f\r\n",sendQ[0],sendQ[1],sendQ[2],sendQ[3]);
+			STOPWATCH_STOP;
+			uint32_t timeDiff = CalcUsecondsFromStopwatch(m_nStart, m_nStop);
+			COM_PutStr(COM1, putS);
+			sprintf((char *)putS,"time = %f\r\n",(float)timeDiff/(1000.0*1000.0));
 			COM_PutStr(COM1, putS);
 
 		}else{
@@ -300,6 +308,7 @@ int main(int argc, char* argv[])
 		}
 	}
 }
+#endif
 
 //中断测试
 /*
