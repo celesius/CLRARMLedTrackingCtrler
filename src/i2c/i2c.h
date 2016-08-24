@@ -55,7 +55,7 @@ typedef enum
 extern uint32_t i2c_speed;	//I2C�����ٶ� = I2C_SPEED_1K / i2c_speed
 
 /* ---------------------------����I2CЭ���д��ʱ����------------------------------*/
-void I2C_Soft_Init(void);	//��ʼ��I2C��IO��
+void I2C_Soft_Init(uint16_t speed);	//��ʼ��I2C��IO��
 void I2C_Start(void);				//����I2C��ʼ�ź�
 void I2C_Stop(void);				//����I2Cֹͣ�ź�
 uint8_t I2C_Wait_ACK(void);	//I2C�ȴ�ACK�ź�

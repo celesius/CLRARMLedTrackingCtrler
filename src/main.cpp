@@ -21,6 +21,7 @@ extern "C" {
 #include "CLRCppTest.h"
 #include "./i2c/CLRI2CInterface.h"
 #include "CLRMPU9250.h"
+#include "MPU6050DMP/CLRMPU6050DMP.h"
 
 // ----------------------------------------------------------------------------
 //
@@ -179,18 +180,157 @@ unsigned char getChar(uint8_t *string){
 		return 0;
 	}
 }
+//INT RCC
+void RCC_INIT(){
+	//RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA | RCC_APB2Periph_AFIO, ENABLE);
+	RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOC | RCC_APB2Periph_AFIO, ENABLE);
+}
+//INT GPIO
+void GPIO_INIT(){
+	GPIO_InitTypeDef GPIO_InitStructure;
+	//GPIO_InitStructure.GPIO_Pin = GPIO_Pin_11;
+	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_0;
+	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPU;
+	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
+	//GPIO_Init(GPIOA, &GPIO_InitStructure);
+	GPIO_Init(GPIOC, &GPIO_InitStructure);
 
-void init_I2C()
+	//将GPIO管脚与外部中断线连接
+	//GPIO_EXTILineConfig(GPIO_PortSourceGPIOA, GPIO_PinSource11);
+	//GPIO_EXTILineConfig(GPIO_PortSourceGPIOC, GPIO_PinSource0);
+}
+//INT EXTI
+void EXTI_INIT(){
+	EXTI_InitTypeDef EXTI_InitStructure;
+	EXTI_ClearITPendingBit(EXTI_Line0);
+	GPIO_EXTILineConfig(GPIO_PortSourceGPIOC, GPIO_PinSource0);
+	//EXTI_InitStructure.EXTI_Line = EXTI_Line11;
+	EXTI_InitStructure.EXTI_Line = EXTI_Line0;
+	EXTI_InitStructure.EXTI_Mode = EXTI_Mode_Interrupt;
+	EXTI_InitStructure.EXTI_Trigger = EXTI_Trigger_Falling;
+	EXTI_InitStructure.EXTI_LineCmd = ENABLE;
+	EXTI_Init(&EXTI_InitStructure);
+}
+//INT NVIC
+void NVIC_INIT(){
+	NVIC_InitTypeDef NVIC_InitStructure;
+	NVIC_PriorityGroupConfig(NVIC_PriorityGroup_0);
+
+	//NVIC_InitStructure.NVIC_IRQChannel = EXTI15_10_IRQn; //PPP外部中断线
+	NVIC_InitStructure.NVIC_IRQChannel = EXTI0_IRQn;//这个channel要与io号相匹配,比如pin0 要用exti0; //PPP外部中断线
+	NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0;
+	NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 0;
+	NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
+	NVIC_Init(&NVIC_InitStructure);
+}
+
+//中断处理程序
+//void EXTI15_10_IRQHandler(void)
+void EXTI0_IRQHandler(void)
 {
-	I2C_Cmd(I2C1, ENABLE);
+    //if (EXTI_GetITStatus(EXTI_Line11) != RESET)
+    //{
+    //    EXTI_ClearITPendingBit(EXTI_Line11); //清除标志
+    //}
+    //trace_printf("key down !!!!\n");
+    //EXTI_ClearITPendingBit(EXTI_Line0); //清除标志
+	uint8_t	putS[60] = "jiangbo\r\n";
+    if (EXTI_GetITStatus(EXTI_Line0) != RESET)
+    {
+        trace_printf("key down !!!!\n");
+		//COM_PutStr(COM1, putS);
+        EXTI_ClearITPendingBit(EXTI_Line0); //清除标志
+    }
+}
+void initIMUINT()
+{
 
 }
 
+void initCOM1(){
+	uint8_t buff[128];
+	strcpy((char*)&COM_INFO[COM1]->name, "COM1");
+	COM_INFO[COM1]->baudrate = 115200;
+	COM_INFO[COM1]->onoff = 1;
+	COM_INFO[COM1]->rxstatus = 0;
+
+	COM_INFO[COM1]->rxnbr = 0;
+	COM_INFO[COM1]->rxsize = 128;//AT_RESP_SIZE;
+	COM_INFO[COM1]->rxbuf = buff;
+
+	COM_Init(COM1, 115200);
+
+}
+
+int main(int argc, char* argv[])
+{
+	timer_start();
+	initCOM1();
+	CLRMPU6050DMP *mpu = new CLRMPU6050DMP();
+	mpu->setup();
+	uint8_t okk[20] = "ok!!!\r\n";
+	uint8_t Noo[20] = "no---\r\n";
+
+	uint8_t	putS[60] = {0};
+
+	int16_t q[4] = {0};
+	float sendQ[4] = {0};
+	while(1){
+		if(mpu->loop(q)){
+			//COM_PutStr(COM1, okk);
+			sendQ[0] = (float)q[0] / 16384.0f;
+			sendQ[1] = (float)q[1] / 16384.0f;
+			sendQ[2] = (float)q[2] / 16384.0f;
+			sendQ[3] = (float)q[3] / 16384.0f;
+
+			//            Serial.print("quat\t");
+//            Serial.print(q.w);
+//            Serial.print("\t");
+//            Serial.print(q.x);
+//            Serial.print("\t");
+//            Serial.print(q.y);
+//            Serial.print("\t");
+//            Serial.println(q.z);
+
+			sprintf((char *)putS,"quat#%f#%f#%f#%f\r\n",sendQ[0],sendQ[1],sendQ[2],sendQ[3]);
+			COM_PutStr(COM1, putS);
+
+		}else{
+			COM_PutStr(COM1, Noo);
+		}
+	}
+}
+
+//中断测试
+/*
+int main(int argc, char* argv[])
+{
+	timer_start();
+	blink_led_init();
+	RCC_INIT();
+	GPIO_INIT();
+	NVIC_INIT();
+	EXTI_INIT();
+	initCOM1();
+	bool led_on = true;
+	while(1){
+		timer_sleep(TIMER_FREQUENCY_HZ/2);
+		if(led_on)
+			blink_led_on();
+		else
+			blink_led_off();
+		led_on = !led_on;
+	}
+}
+*/
+
 //uart + imu
+#if 0
 #define MPU9250_ADDRESS 0x68<<1  // Device address when ADO = 0
 int main(int argc, char* argv[])
 {
 	timer_start();
+	blink_led_init();
 	CLRI2CInterface *i2c = new CLRI2CInterface();
 	uint8_t buff[128];
 	strcpy((char*)&COM_INFO[COM1]->name, "COM1");
@@ -203,7 +343,7 @@ int main(int argc, char* argv[])
 	COM_INFO[COM1]->rxbuf = buff;
 
 	COM_Init(COM1, 115200);
-	uint8_t	putS[60] = "jiangbo\r\n";
+	uint8_t	putS[60] = "jiangbo\r";
 	//std::string *putS;// =  new std::string;  //"jiangbo";
 	int loop = 0;
 	char *loopChar;
@@ -223,6 +363,7 @@ int main(int argc, char* argv[])
 
 	float tempTime = 0;
 	float lastTime = 0;
+	bool led_on = true;
 	while(0){
 		//STOPWATCH_START;
 		timer_sleep(TIMER_FREQUENCY_HZ/2);
@@ -249,6 +390,13 @@ int main(int argc, char* argv[])
 		i2c->read( MPU9250_ADDRESS,0x75, &read_data, 1, 0);
 		trace_printf("read = 0x%x\n", read_data);
 		read_data = 0;
+
+		if(led_on)
+			blink_led_on();
+		else
+			blink_led_off();
+		led_on = !led_on;
+
 
 		trace_puts("Hello ARM World!\n");
 	}
@@ -348,6 +496,7 @@ int main(int argc, char* argv[])
 
 		deltat = (float)((Now - lastUpdate)/1000000.0f) ; // set integration time by time elapsed since last filter update
 		lastUpdate = Now;
+		//trace_printf("deltat = %f\n", deltat);
 
 		sum += deltat;
 		sumCount++;
@@ -370,17 +519,33 @@ int main(int argc, char* argv[])
 		yaw   -= 13.8f; // Declination at Danville, California is 13 degrees 48 minutes and 47 seconds on 2014-04-04
 		roll  *= 180.0f / PI;
 
-		trace_printf("Yaw, Pitch, Roll: %f %f %f\n\r", yaw, pitch, roll);
-		sprintf((char *)putS,"%f %f %f\r\n",yaw,pitch,roll);
+		//if(led_on)
+		//	blink_led_on();
+		//else
+		//	blink_led_off();
+		//led_on = !led_on;
+		trace_printf("Yaw, Pitch, Roll: %f %f %f\n", yaw, pitch, roll);
+		//sprintf((char *)putS,"%fp%fp%fpn\r",yaw,pitch,roll);
+		sprintf((char *)putS,"%fp%fp%fp%fpn\r",mpu9250->q[0],mpu9250->q[1],mpu9250->q[2],mpu9250->q[3]);
 		COM_PutStr(COM1, putS);
 
-		/*
 		// Serial print and/or display at 0.5 s rate independent of data rates
+#if 0
 		STOPWATCH_START;
 		int nowMs = (int)getMs(m_nStart);
 		//delt_t = t.read_ms() - count;
 		delt_t = nowMs - count;
-		if (delt_t > 500) { // update LCD once per half-second independent of read rate
+		if (delt_t > 30) { // update LCD once per half-second independent of read rate
+		//sprintf((char *)putS,"%fp%fp%fp%fpn\r",mpu9250->q[0],mpu9250->q[1],mpu9250->q[2],mpu9250->q[3]);
+		//COM_PutStr(COM1, putS);
+
+
+
+			STOPWATCH_START;
+			count = (int)getMs(m_nStart);
+			sum = 0;
+			sumCount = 0;
+
 
 			trace_printf("ax = %f", 1000*mpu9250->ax);
 			trace_printf(" ay = %f", 1000*mpu9250->ay);
@@ -435,11 +600,11 @@ int main(int argc, char* argv[])
 			sum = 0;
 			sumCount = 0;
 		}
-		*/
+#endif
 	}
 #endif
 }
-
+#endif
 //uart + led
 uint16_t led_mask;
 #if 0

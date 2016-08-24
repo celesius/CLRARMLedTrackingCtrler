@@ -28,6 +28,7 @@ CPP_DEPS :=
 # Every subdirectory with source files must be described here
 SUBDIRS := \
 src \
+src/MPU6050DMP \
 src/common/delay \
 src/i2c \
 system/src/cmsis \

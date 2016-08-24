@@ -15,6 +15,7 @@ RM := rm -rf
 -include system/src/cmsis/subdir.mk
 -include src/i2c/subdir.mk
 -include src/common/delay/subdir.mk
+-include src/MPU6050DMP/subdir.mk
 -include src/subdir.mk
 -include subdir.mk
 -include objects.mk
@@ -50,38 +51,38 @@ endif
 
 # Add inputs and outputs from these tool invocations to the build variables 
 SECONDARY_FLASH += \
-CLRARMLedTrackingCtrler.hex \
+CLRHelloTimer.hex \
 
 SECONDARY_SIZE += \
-CLRARMLedTrackingCtrler.siz \
+CLRHelloTimer.siz \
 
 
 # All Target
-all: CLRARMLedTrackingCtrler.elf secondary-outputs
+all: CLRHelloTimer.elf secondary-outputs
 
 # Tool invocations
-CLRARMLedTrackingCtrler.elf: $(OBJS) $(USER_OBJS)
+CLRHelloTimer.elf: $(OBJS) $(USER_OBJS)
 	@echo 'Building target: $@'
 	@echo 'Invoking: Cross ARM C++ Linker'
-	arm-none-eabi-g++ -mcpu=cortex-m3 -mthumb -Og -fmessage-length=0 -fsigned-char -ffunction-sections -fdata-sections -ffreestanding -fno-move-loop-invariants -Wall -Wextra  -g3 -T mem.ld -T libs.ld -T sections.ld -nostartfiles -Xlinker --gc-sections -L"../ldscripts" -Wl,-Map,"CLRARMLedTrackingCtrler.map" -Xlinker --print-map --specs=nano.specs -u _printf_float -o "CLRARMLedTrackingCtrler.elf" $(OBJS) $(USER_OBJS) $(LIBS)
+	arm-none-eabi-g++ -mcpu=cortex-m3 -mthumb -Og -fmessage-length=0 -fsigned-char -ffunction-sections -fdata-sections -ffreestanding -fno-move-loop-invariants -Wall -Wextra  -g3 -T mem.ld -T libs.ld -T sections.ld -nostartfiles -Xlinker --gc-sections -L"../ldscripts" -Wl,-Map,"CLRHelloTimer.map" -Xlinker --print-map --specs=nano.specs -u _printf_float -o "CLRHelloTimer.elf" $(OBJS) $(USER_OBJS) $(LIBS)
 	@echo 'Finished building target: $@'
 	@echo ' '
 
-CLRARMLedTrackingCtrler.hex: CLRARMLedTrackingCtrler.elf
+CLRHelloTimer.hex: CLRHelloTimer.elf
 	@echo 'Invoking: Cross ARM GNU Create Flash Image'
-	arm-none-eabi-objcopy -O ihex "CLRARMLedTrackingCtrler.elf"  "CLRARMLedTrackingCtrler.hex"
+	arm-none-eabi-objcopy -O ihex "CLRHelloTimer.elf"  "CLRHelloTimer.hex"
 	@echo 'Finished building: $@'
 	@echo ' '
 
-CLRARMLedTrackingCtrler.siz: CLRARMLedTrackingCtrler.elf
+CLRHelloTimer.siz: CLRHelloTimer.elf
 	@echo 'Invoking: Cross ARM GNU Print Size'
-	arm-none-eabi-size --format=berkeley "CLRARMLedTrackingCtrler.elf"
+	arm-none-eabi-size --format=berkeley "CLRHelloTimer.elf"
 	@echo 'Finished building: $@'
 	@echo ' '
 
 # Other Targets
 clean:
-	-$(RM) $(CC_DEPS)$(C++_DEPS)$(OBJS)$(C_UPPER_DEPS)$(CXX_DEPS)$(SECONDARY_FLASH)$(SECONDARY_SIZE)$(ASM_DEPS)$(S_UPPER_DEPS)$(C_DEPS)$(CPP_DEPS) CLRARMLedTrackingCtrler.elf
+	-$(RM) $(CC_DEPS)$(C++_DEPS)$(OBJS)$(C_UPPER_DEPS)$(CXX_DEPS)$(SECONDARY_FLASH)$(SECONDARY_SIZE)$(ASM_DEPS)$(S_UPPER_DEPS)$(C_DEPS)$(CPP_DEPS) CLRHelloTimer.elf
 	-@echo ' '
 
 secondary-outputs: $(SECONDARY_FLASH) $(SECONDARY_SIZE)

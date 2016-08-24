@@ -43,7 +43,7 @@ uint32_t	i2c_speed = I2C_SPEED_1K/100;
 	*		SCL: 	PB10
 	*		SDA:	PB11
   */
-void I2C_Soft_Init(void)
+void I2C_Soft_Init(uint16_t speed)
 {
 	GPIO_InitTypeDef GPIO_InitStructure;
 
@@ -61,7 +61,7 @@ void I2C_Soft_Init(void)
 	I2C_SCL = 1;
 	I2C_SDA = 1;
 	
-	I2C_SetSpeed(100);//����I2C�����ٶ�Ϊ100Kbps
+	I2C_SetSpeed(speed);//����I2C�����ٶ�Ϊ100Kbps
 }
 
 
