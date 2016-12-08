@@ -1031,6 +1031,7 @@ class MPU6050 {
 
     private:
         CLRI2CInterface *i2c;
+        //struct CLR_I2C_port i2c_port;
         uint8_t devAddr;
         uint8_t buffer[14];
 };

@@ -7,9 +7,9 @@
 #ifndef CLRI2CINTERFACE_H_
 #define CLRI2CINTERFACE_H_
 #include "stm32f10x.h"
-
 class CLRI2CInterface {
 public:
+	//CLRI2CInterface(struct CLR_I2C_port a_i2c_port);
 	CLRI2CInterface();
 	CLRI2CInterface(uint16_t speed);
 	virtual ~CLRI2CInterface();
@@ -27,6 +27,7 @@ public:
     bool readBit(uint8_t devAddr, uint8_t regAddr, uint8_t bitNum, uint8_t *data);
     bool readBits(uint8_t devAddr, uint8_t regAddr, uint8_t bitStart, uint8_t length, uint8_t *data);
 private:
+    //struct CLR_I2C_port m_i2c_port;
 
 };
 

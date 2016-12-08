@@ -51,6 +51,8 @@ MPU6050::MPU6050() {
     devAddr = MPU6050_DEFAULT_ADDRESS << 1;
     dmpPacketSize = 42;
     //clover system
+    //i2c_port = {GPIOC, 12, 11}; // 这里有问题, miu sda = pc12 scl = pa11, 稍后再调
+    //i2c = new CLRI2CInterface(&i2c_port,400);
     i2c = new CLRI2CInterface(400);
 }
 
@@ -63,6 +65,8 @@ MPU6050::MPU6050() {
 MPU6050::MPU6050(uint8_t address) {
     devAddr = address;
     dmpPacketSize = 42;
+    //i2c_port = {GPIOC, 12, 11}; // 这里有问题, miu sda = pc12 scl = pa11, 稍后再调
+    //i2c = new CLRI2CInterface(&i2c_port, 400);
     i2c = new CLRI2CInterface(400);
 }
 
@@ -85,6 +89,7 @@ void MPU6050::initialize() {
  * @return True if connection is valid, false otherwise
  */
 bool MPU6050::testConnection() {
+	trace_printf("ID = 0x%x", getDeviceID());
     return getDeviceID() == 0x34;
     //return getDeviceID() == 0x71;
 }

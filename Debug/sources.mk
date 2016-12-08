@@ -27,8 +27,18 @@ CPP_DEPS :=
 
 # Every subdirectory with source files must be described here
 SUBDIRS := \
+src/ADC \
 src \
+src/Button \
+src/Debug \
+src/EEPROM \
+src/IRTracking \
+src/LED \
 src/MPU6050DMP \
+src/PWMOut \
+src/RTC \
+src/TIMER \
+src/TSM12 \
 src/common/delay \
 src/i2c \
 system/src/cmsis \

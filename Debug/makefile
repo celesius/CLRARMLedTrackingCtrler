@@ -15,7 +15,17 @@ RM := rm -rf
 -include system/src/cmsis/subdir.mk
 -include src/i2c/subdir.mk
 -include src/common/delay/subdir.mk
+-include src/TSM12/subdir.mk
+-include src/TIMER/subdir.mk
+-include src/RTC/subdir.mk
+-include src/PWMOut/subdir.mk
 -include src/MPU6050DMP/subdir.mk
+-include src/LED/subdir.mk
+-include src/IRTracking/subdir.mk
+-include src/EEPROM/subdir.mk
+-include src/Debug/subdir.mk
+-include src/Button/subdir.mk
+-include src/ADC/subdir.mk
 -include src/subdir.mk
 -include subdir.mk
 -include objects.mk
@@ -64,7 +74,7 @@ all: CLRHelloTimer.elf secondary-outputs
 CLRHelloTimer.elf: $(OBJS) $(USER_OBJS)
 	@echo 'Building target: $@'
 	@echo 'Invoking: Cross ARM C++ Linker'
-	arm-none-eabi-g++ -mcpu=cortex-m3 -mthumb -Og -fmessage-length=0 -fsigned-char -ffunction-sections -fdata-sections -ffreestanding -fno-move-loop-invariants -Wall -Wextra  -g3 -T mem.ld -T libs.ld -T sections.ld -nostartfiles -Xlinker --gc-sections -L"../ldscripts" -Wl,-Map,"CLRHelloTimer.map" -Xlinker --print-map --specs=nano.specs -u _printf_float -o "CLRHelloTimer.elf" $(OBJS) $(USER_OBJS) $(LIBS)
+	arm-none-eabi-g++ -mcpu=cortex-m3 -mthumb -Og -fmessage-length=0 -fsigned-char -ffunction-sections -fdata-sections -ffreestanding -fno-move-loop-invariants -Wall -Wextra  -g3 -T "/home/clover/workspace/EclipseARMCHome/CLRHelloTimer/ldscripts/mem.ld" -T "/home/clover/workspace/EclipseARMCHome/CLRHelloTimer/ldscripts/libs.ld" -T "/home/clover/workspace/EclipseARMCHome/CLRHelloTimer/ldscripts/sections.ld" -nostartfiles -Xlinker --gc-sections -Wl,-Map,"CLRHelloTimer.map" --specs=nano.specs -o "CLRHelloTimer.elf" $(OBJS) $(USER_OBJS) $(LIBS)
 	@echo 'Finished building target: $@'
 	@echo ' '
 

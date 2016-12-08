@@ -17,11 +17,13 @@ class CLRMPU6050DMP {
 public:
 	CLRMPU6050DMP();
 	virtual ~CLRMPU6050DMP();
-	void setup();
-	bool loop(int16_t *q);
+	bool loop(float *q);
 private:
+//方法
+	void setup();
+//变量
 	MPU6050 *mpu;
-	//int32_t q[4];
+	int16_t getQ[4];
 	//unsigned char serialString[100];
 
 };

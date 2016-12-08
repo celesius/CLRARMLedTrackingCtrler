@@ -31,20 +31,39 @@
  ******************************************************************************/
 #ifndef __I2C_H
 #define __I2C_H
+
 #include "stm32f10x.h"
+
+#ifdef __cpluscplus
+extern "C" {
+#endif
+
 #include "../common/bitband.h"
 
 #define I2C_SPEED_1K		5000	//���ݴ������ٶ����ã����ﴦ�����ٶ���72MHz
 
+struct CLR_I2C_port{
+	GPIO_TypeDef *io_port;
+	uint8_t io_number;
+};
+
 //I2C�˿ڶ���
-#define I2C_SCL    GPIOout(GPIOB, 10)	//SCL
-#define I2C_SDA    GPIOout(GPIOB, 11)	//SDA	 
-#define READ_SDA   GPIOin( GPIOB, 11)	//����SDA
+//#define I2C_SCL    GPIOout(GPIOB, 10)	//SCL 10
+//#define I2C_SDA    GPIOout(GPIOB, 11)	//SDA 11
+//#define READ_SDA   GPIOin( GPIOB, 11)	//����SDA
+
+//struct CLR_I2C_port myport = {GPIOB,8};
+
+#define I2C_SCL    GPIOout(GPIOB, 8)	//SCL tsm12 pb8
+#define I2C_SDA    GPIOout(GPIOB, 9)	//SDA tsm12 pb9
+#define READ_SDA   GPIOin( GPIOB, 9)	//����SDA
 
 //����PB11�������
-#define SDA_IN()  {GPIOB->CRH&=0XFFFF0FFF;GPIOB->CRH|=8<<12;}
-#define SDA_OUT() {GPIOB->CRH&=0XFFFF0FFF;GPIOB->CRH|=3<<12;}
-
+//#define SDA_IN()  {GPIOB->CRH&=0XFFFF0FFF;GPIOB->CRH|=8<<12;}
+//#define SDA_OUT() {GPIOB->CRH&=0XFFFF0FFF;GPIOB->CRH|=3<<12;}
+//pb9
+#define SDA_IN()  {GPIOB->CRH&=0XFFFFFF0F;GPIOB->CRH|=8<<4;}
+#define SDA_OUT() {GPIOB->CRH&=0XFFFFFF0F;GPIOB->CRH|=3<<4;}
 typedef enum
 {
 	I2C_SUCCESS = 0,
@@ -79,3 +98,6 @@ I2C_StatusTypeDef I2C_WriteBit(uint8_t DevAddr, uint8_t DataAddr, uint8_t Bitx, 
 
 /********************* (C) COPYRIGHT 2014 WWW.UCORTEX.COM **********END OF FILE**********/
 
+#ifdef __cpluscplus
+}
+#endif

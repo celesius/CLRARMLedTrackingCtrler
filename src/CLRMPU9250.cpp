@@ -6,10 +6,11 @@
  */
 
 extern "C" {
+#include <math.h>
 #include "CLRMPU9250.h"
 #include "./i2c/CLRI2CInterface.h"
-#include <math.h>
 #include "common/delay/delay.h"
+#include "diag/Trace.h"
 // See also MPU-9250 Register Map and Descriptions, Revision 4.0, RM-MPU-9250A-00, Rev. 1.4, 9/9/2013 for registers not listed in
 // above document; the MPU9250 and MPU9150 are virtually identical but the latter has a different register map
 //
@@ -218,7 +219,9 @@ float eInt[3] = {0.0f, 0.0f, 0.0f};              // vector to hold integral erro
 
 CLRMPU9250::CLRMPU9250() {
 	// TODO Auto-generated constructor stub
-	i2c = new CLRI2CInterface();
+	//i2c_port = {GPIOC, 12, 11};
+	//i2c = new CLRI2CInterface(&i2c_port, 400);
+	i2c = new CLRI2CInterface(400);
 	Delay_Init();
 	q[0]= 1.0f;
 	for(int i= 0;i<3;i++){
@@ -247,10 +250,197 @@ CLRMPU9250::CLRMPU9250() {
 	mx = 0;
 	my = 0;
 	mz = 0; // variables to hold latest sensor data values
+	//setup();
 }
 
 CLRMPU9250::~CLRMPU9250() {
 	// TODO Auto-generated destructor stub
+}
+
+void CLRMPU9250::setup(){
+		// Read the WHO_AM_I register, this is a good test of communication
+	uint8_t whoami = readByte(MPU9250_ADDRESS, 0x75);  // Read WHO_AM_I register for MPU-9250
+	trace_printf("I AM 0x%x\n", whoami);
+	trace_printf("I SHOULD BE 0x71\n");
+
+	if (whoami == 0x71) // WHO_AM_I should always be 0x68
+	{
+		trace_printf("MPU9250 is online...\n\r");
+		this->wait(1);
+		//lcd.clear();
+		//lcd.printString("MPU9250 OK", 0, 0);
+		this->resetMPU9250(); // Reset registers to default in preparation for device calibration
+		trace_printf("eeerr\n");
+		this->calibrateMPU9250(gyroBias, accelBias); // Calibrate gyro and accelerometers, load biases in bias registers
+		trace_printf("x gyro bias = %f\n",  gyroBias[0]);
+		trace_printf("y gyro bias = %f\n",  gyroBias[1]);
+		trace_printf("z gyro bias = %f\n",  gyroBias[2]);
+		trace_printf("x accel bias = %f\n", accelBias[0]);
+		trace_printf("y accel bias = %f\n", accelBias[1]);
+		trace_printf("z accel bias = %f\n", accelBias[2]);
+		this->wait(2);
+		this->initMPU9250();
+		trace_printf("MPU9250 initialized for active data mode....\n\r"); // Initialize device for active mode read of acclerometer, gyroscope, and temperature
+		this->initAK8963(magCalibration);
+		trace_printf("AK8963 initialized for active data mode....\n\r"); // Initialize device for active mode read of magnetometer
+		trace_printf("Accelerometer full-scale range = %f  g\n\r", 2.0f*(float)(1<<Ascale));
+		trace_printf("Gyroscope full-scale range = %f  deg/s\n\r", 250.0f*(float)(1<<Gscale));
+		if(this->Mscale == 0) trace_printf("Magnetometer resolution = 14  bits\n\r");
+		if(this->Mscale == 1) trace_printf("Magnetometer resolution = 16  bits\n\r");
+		if(this->Mmode == 2) trace_printf("Magnetometer ODR = 8 Hz\n\r");
+		if(this->Mmode == 6) trace_printf("Magnetometer ODR = 100 Hz\n\r");
+		wait(2);
+	}
+	else
+	{
+		trace_printf("Could not connect to MPU9250: \n\r");
+		trace_printf("%#x \n",  whoami);
+
+		//lcd.clear();
+		//lcd.printString("MPU9250", 0, 0);
+		//lcd.printString("no connection", 0, 1);
+		//lcd.printString("0x", 0, 2);  lcd.setXYAddress(20, 2); lcd.printChar(whoami);
+
+		while(1) ; // Loop forever if communication doesn't happen
+	}
+
+	getAres(); // Get accelerometer sensitivity
+	getGres(); // Get gyro sensitivity
+	getMres(); // Get magnetometer sensitivity
+	trace_printf("Accelerometer sensitivity is %f LSB/g \n\r", 1.0f/aRes);
+	trace_printf("Gyroscope sensitivity is %f LSB/deg/s \n\r", 1.0f/gRes);
+	trace_printf("Magnetometer sensitivity is %f LSB/G \n\r",  1.0f/mRes);
+	magbias[0] = +470.;  // User environmental x-axis correction in milliGauss, should be automatically calculated
+	magbias[1] = +120.;  // User environmental x-axis correction in milliGauss
+	magbias[2] = +125.;  // User environmental x-axis correction in milliGauss
+}
+
+void CLRMPU9250::loop(float *outQ, float deltat)
+{
+
+	// If intPin goes high, all data registers have new data
+	if(readByte(MPU9250_ADDRESS, INT_STATUS) & 0x01) {  // On interrupt, check if data ready interrupt
+
+		readAccelData(accelCount);  // Read the x/y/z adc values
+		// Now we'll calculate the accleration value into actual g's
+		ax = (float)accelCount[0]*aRes - accelBias[0];  // get actual g value, this depends on scale being set
+		ay = (float)accelCount[1]*aRes - accelBias[1];
+		az = (float)accelCount[2]*aRes - accelBias[2];
+
+		readGyroData(gyroCount);  // Read the x/y/z adc values
+		// Calculate the gyro value into actual degrees per second
+		gx = (float)gyroCount[0]*gRes - gyroBias[0];  // get actual gyro value, this depends on scale being set
+		gy = (float)gyroCount[1]*gRes - gyroBias[1];
+		gz = (float)gyroCount[2]*gRes - gyroBias[2];
+
+		readMagData(magCount);  // Read the x/y/z adc values
+		// Calculate the magnetometer values in milliGauss
+		// Include factory calibration per data sheet and user environmental corrections
+		mx = (float)magCount[0]*mRes*magCalibration[0] - magbias[0];  // get actual magnetometer value, this depends on scale being set
+		my = (float)magCount[1]*mRes*magCalibration[1] - magbias[1];
+		mz = (float)magCount[2]*mRes*magCalibration[2] - magbias[2];
+	}
+
+	/*
+		STOPWATCH_START;
+		Now	= getUs(m_nStart);
+		deltat = (float)((Now - lastUpdate)/1000000.0f) ; // set integration time by time elapsed since last filter update
+		lastUpdate = Now;
+		sum += deltat;
+		sumCount++;
+	 */
+	//    if(lastUpdate - firstUpdate > 10000000.0f) {
+	//     beta = 0.04;  // decrease filter gain after stabilized
+	//     zeta = 0.015; // increasey bias drift gain after stabilized
+	//   }
+
+	// Pass gyro rate as rad/s
+	//trace_printf("My function took %f seconds\n", deltat);
+	MadgwickQuaternionUpdate(deltat, ax, ay, az, gx*PI/180.0f, gy*PI/180.0f, gz*PI/180.0f,  my,  mx, mz);
+	// mpu9250.MahonyQuaternionUpdate(ax, ay, az, gx*PI/180.0f, gy*PI/180.0f, gz*PI/180.0f, my, mx, mz);
+	for(int i=0;i<4;i++)
+		outQ[i] = q[i];
+	/*
+		float yaw   = atan2(2.0f * (q[1] * q[2] + q[0] * q[3]), q[0] * q[0] + q[1] * q[1] - q[2] * q[2] - q[3] * q[3]);
+		float pitch = -asin(2.0f * (q[1] * q[3] - q[0] * q[2]));
+		float roll  = atan2(2.0f * (q[0] * q[1] + q[2] * q[3]), q[0] * q[0] - q[1] * q[1] - q[2] * q[2] + q[3] * q[3]);
+		pitch *= 180.0f / PI;
+		yaw   *= 180.0f / PI;
+		yaw   -= 13.8f; // Declination at Danville, California is 13 degrees 48 minutes and 47 seconds on 2014-04-04
+		roll  *= 180.0f / PI;
+	 */
+#if 0
+	STOPWATCH_START;
+	int nowMs = (int)getMs(m_nStart);
+	//delt_t = t.read_ms() - count;
+	delt_t = nowMs - count;
+	if (delt_t > 30) { // update LCD once per half-second independent of read rate
+		//sprintf((char *)putS,"%fp%fp%fp%fpn\r",mpu9250->q[0],mpu9250->q[1],mpu9250->q[2],mpu9250->q[3]);
+		//COM_PutStr(COM1, putS);
+
+
+
+		STOPWATCH_START;
+		count = (int)getMs(m_nStart);
+		sum = 0;
+		sumCount = 0;
+
+
+		trace_printf("ax = %f", 1000*mpu9250->ax);
+		trace_printf(" ay = %f", 1000*mpu9250->ay);
+		trace_printf(" az = %f  mg\n\r", 1000*mpu9250->az);
+
+		trace_printf("gx = %f", mpu9250->gx);
+		trace_printf(" gy = %f", mpu9250->gy);
+		trace_printf(" gz = %f  deg/s\n\r", mpu9250->gz);
+
+		trace_printf("gx = %f", mpu9250->mx);
+		trace_printf(" gy = %f", mpu9250->my);
+		trace_printf(" gz = %f  mG\n\r", mpu9250->mz);
+
+		tempCount = mpu9250->readTempData();  // Read the adc values
+		temperature = ((float) tempCount) / 333.87f + 21.0f; // Temperature in degrees Centigrade
+		trace_printf(" temperature = %f  C\n\r", temperature);
+
+		trace_printf("q0 = %f\n\r", mpu9250->q[0]);
+		trace_printf("q1 = %f\n\r", mpu9250->q[1]);
+		trace_printf("q2 = %f\n\r", mpu9250->q[2]);
+		trace_printf("q3 = %f\n\r", mpu9250->q[3]);
+
+		//lcd.clear();
+		//lcd.printString("MPU9250", 0, 0);
+		//lcd.printString("x   y   z", 0, 1);
+		//lcd.setXYAddress(0, 2); lcd.printChar((char)(1000*ax));
+		//lcd.setXYAddress(20, 2); lcd.printChar((char)(1000*ay));
+		//lcd.setXYAddress(40, 2); lcd.printChar((char)(1000*az)); lcd.printString("mg", 66, 2);
+
+		// Define output variables from updated quaternion---these are Tait-Bryan angles, commonly used in aircraft orientation.
+		// In this coordinate system, the positive z-axis is down toward Earth.
+		// Yaw is the angle between Sensor x-axis and Earth magnetic North (or true North if corrected for local declination, looking down on the sensor positive yaw is counterclockwise.
+		// Pitch is angle between sensor x-axis and Earth ground plane, toward the Earth is positive, up toward the sky is negative.
+		// Roll is angle between sensor y-axis and Earth ground plane, y-axis up is positive roll.
+		// These arise from the definition of the homogeneous rotation matrix constructed from quaternions.
+		// Tait-Bryan angles as well as Euler angles are non-commutative; that is, the get the correct orientation the rotations must be
+		// applied in the correct order which for this configuration is yaw, pitch, and then roll.
+		// For more see http://en.wikipedia.org/wiki/Conversion_between_quaternions_and_Euler_angles which has additional links.
+		yaw   = atan2(2.0f * (mpu9250->q[1] * mpu9250->q[2] + mpu9250->q[0] * mpu9250->q[3]), mpu9250->q[0] * mpu9250->q[0] + mpu9250->q[1] * mpu9250->q[1] - mpu9250->q[2] * mpu9250->q[2] - mpu9250->q[3] * mpu9250->q[3]);
+		pitch = -asin(2.0f * (mpu9250->q[1] * mpu9250->q[3] - mpu9250->q[0] * mpu9250->q[2]));
+		roll  = atan2(2.0f * (mpu9250->q[0] * mpu9250->q[1] + mpu9250->q[2] * mpu9250->q[3]), mpu9250->q[0] * mpu9250->q[0] - mpu9250->q[1] * mpu9250->q[1] - mpu9250->q[2] * mpu9250->q[2] + mpu9250->q[3] * mpu9250->q[3]);
+		pitch *= 180.0f / PI;
+		yaw   *= 180.0f / PI;
+		yaw   -= 13.8f; // Declination at Danville, California is 13 degrees 48 minutes and 47 seconds on 2014-04-04
+		roll  *= 180.0f / PI;
+
+		trace_printf("Yaw, Pitch, Roll: %f %f %f\n\r", yaw, pitch, roll);
+		trace_printf("average rate = %f\n\r", (float) sumCount/sum);
+
+		STOPWATCH_START;
+		count = (int)getMs(m_nStart);
+		sum = 0;
+		sumCount = 0;
+	}
+#endif
+
 }
 
 //time is seconds

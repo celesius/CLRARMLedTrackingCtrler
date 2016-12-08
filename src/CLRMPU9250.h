@@ -30,6 +30,7 @@ public:
 	void readGyroData(int16_t * destination);
 	void readMagData(int16_t * destination);
 	int16_t readTempData();
+	void loop(float *q,float deltat);
 
 	float magCalibration[3];
 	float accelBias[3];
@@ -46,11 +47,14 @@ public:
 	float ax, ay, az, gx, gy, gz, mx, my, mz; // variables to hold latest sensor data values
 	float q[4];           // vector to hold quaternion
 private:
-	CLRI2CInterface *i2c;
+	void setup();
 	void writeByte(uint8_t address, uint8_t subAddress, uint8_t data);
 	void readBytes(uint8_t address, uint8_t subAddress, uint8_t count, uint8_t * dest);
 	void MPU9250SelfTest(float * destination);
 	void MahonyQuaternionUpdate(float deltat, float ax, float ay, float az, float gx, float gy, float gz, float mx, float my, float mz);
+
+	CLRI2CInterface *i2c;
+	//struct CLR_I2C_port i2c_port;
 };
 
 #endif /* CLRMPU9250_H_ */

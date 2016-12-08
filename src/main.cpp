@@ -10,18 +10,32 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include "Button/IFVRCtrlerButton.h"
+#include "IFVRCtrlerSys.h"
 extern "C" {
 #include "stm32f10x.h"
 #include "diag/Trace.h"
+//#include <cmsis_armcc.h>
 
 #include "Timer.h"
 #include "BlinkLed.h"
 #include "usart.h"
+#include "ADC/CLRADC.h"
 
-#include "CLRCppTest.h"
-#include "./i2c/CLRI2CInterface.h"
-#include "CLRMPU9250.h"
-#include "MPU6050DMP/CLRMPU6050DMP.h"
+//#include "CLRCppTest.h"
+//#include "./i2c/CLRI2CInterface.h"
+//#include "CLRMPU9250.h"
+//#include "MPU6050DMP/CLRMPU6050DMP.h"
+
+//#include "IRTracking/CLRIRLed.h"
+//#include "PWMOut/CLRPWMCtrl.h"
+#include "IRTracking/CLRIRLed.h"
+
+#include "bluetooth.h"
+
+#include "common/delay/delay.h"
+
+#include "TSM12/CLRTouchpad.h"
 
 // ----------------------------------------------------------------------------
 //
@@ -58,6 +72,10 @@ extern "C" {
 uint32_t m_nStart;               //DEBUG Stopwatch start cycle counter value
 uint32_t m_nStop;                //DEBUG Stopwatch stop cycle counter value
 
+//#define BLUETOOTHTEST
+//#define COMTEST
+#define TOUCHPADTEST
+
 #define BLINK_ON_TICKS  (TIMER_FREQUENCY_HZ * 3 / 4)
 #define BLINK_OFF_TICKS (TIMER_FREQUENCY_HZ - BLINK_ON_TICKS)
 
@@ -75,7 +93,6 @@ uint32_t m_nStop;                //DEBUG Stopwatch stop cycle counter value
 
 /* Core Debug registers */
 #define DEMCR           (*((volatile uint32_t *)0xE000EDFC))
-
 #define DWT_CTRL        (*(volatile uint32_t *)0xe0001000)
 #define CYCCNTENA       (1<<0)
 #define DWT_CYCCNT      ((volatile uint32_t *)0xE0001004)
@@ -127,34 +144,31 @@ uint32_t CalcUsecondsFromStopwatch(uint32_t nStart, uint32_t nStop)
 	return nTemp;
 }
 
-float getSecond(uint32_t nTime){
+float getSecond(){
+	STOPWATCH_START;
 	uint32_t nTemp;
 	uint32_t n;
 	n = SystemCoreClock / 1000000;          // Convert Hz to MHz. SystemCoreClock = 168000000
-	nTemp = nTime / n;
+	nTemp = m_nStart / n;
 	return  (float)nTemp/(1000.0*1000.0);
 }
 
-float getMs(uint32_t nTime){
+float getMs(){
+	STOPWATCH_START;
 	uint32_t nTemp;
 	uint32_t n;
 	n = SystemCoreClock / 1000000;          // Convert Hz to MHz. SystemCoreClock = 168000000
-	nTemp = nTime / n;
+	nTemp = m_nStart / n;
 	return  (float)nTemp/(1000.0);
 }
 
-float getUs(uint32_t nTime){
+float getUs(uint32_t in ){
+	//STOPWATCH_START;
 	uint32_t nTemp;
 	uint32_t n;
 	n = SystemCoreClock / 1000000;          // Convert Hz to MHz. SystemCoreClock = 168000000
-	nTemp = nTime / n;
+	nTemp = in / n;
 	return  (float)nTemp;
-}
-
-
-void getArray(uint8_t *allData, uint16_t vDataLength, uint8_t *vData)
-{
-
 }
 
 unsigned char getChar(uint8_t *string){
@@ -180,53 +194,10 @@ unsigned char getChar(uint8_t *string){
 		return 0;
 	}
 }
-//INT RCC
-void RCC_INIT(){
-	//RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA | RCC_APB2Periph_AFIO, ENABLE);
-	RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOC | RCC_APB2Periph_AFIO, ENABLE);
-}
-//INT GPIO
-void GPIO_INIT(){
-	GPIO_InitTypeDef GPIO_InitStructure;
-	//GPIO_InitStructure.GPIO_Pin = GPIO_Pin_11;
-	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_0;
-	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPU;
-	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
-	//GPIO_Init(GPIOA, &GPIO_InitStructure);
-	GPIO_Init(GPIOC, &GPIO_InitStructure);
-
-	//将GPIO管脚与外部中断线连接
-	//GPIO_EXTILineConfig(GPIO_PortSourceGPIOA, GPIO_PinSource11);
-	//GPIO_EXTILineConfig(GPIO_PortSourceGPIOC, GPIO_PinSource0);
-}
-//INT EXTI
-void EXTI_INIT(){
-	EXTI_InitTypeDef EXTI_InitStructure;
-	EXTI_ClearITPendingBit(EXTI_Line0);
-	GPIO_EXTILineConfig(GPIO_PortSourceGPIOC, GPIO_PinSource0);
-	//EXTI_InitStructure.EXTI_Line = EXTI_Line11;
-	EXTI_InitStructure.EXTI_Line = EXTI_Line0;
-	EXTI_InitStructure.EXTI_Mode = EXTI_Mode_Interrupt;
-	EXTI_InitStructure.EXTI_Trigger = EXTI_Trigger_Falling;
-	EXTI_InitStructure.EXTI_LineCmd = ENABLE;
-	EXTI_Init(&EXTI_InitStructure);
-}
-//INT NVIC
-void NVIC_INIT(){
-	NVIC_InitTypeDef NVIC_InitStructure;
-	NVIC_PriorityGroupConfig(NVIC_PriorityGroup_0);
-
-	//NVIC_InitStructure.NVIC_IRQChannel = EXTI15_10_IRQn; //PPP外部中断线
-	NVIC_InitStructure.NVIC_IRQChannel = EXTI0_IRQn;//这个channel要与io号相匹配,比如pin0 要用exti0; //PPP外部中断线
-	NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0;
-	NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 0;
-	NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
-	NVIC_Init(&NVIC_InitStructure);
-}
 
 //中断处理程序
-//void EXTI15_10_IRQHandler(void)
-void EXTI0_IRQHandler(void)
+void EXTI15_10_IRQHandler(void)
+//void EXTI0_IRQHandler(void)
 {
     //if (EXTI_GetITStatus(EXTI_Line11) != RESET)
     //{
@@ -235,74 +206,275 @@ void EXTI0_IRQHandler(void)
     //trace_printf("key down !!!!\n");
     //EXTI_ClearITPendingBit(EXTI_Line0); //清除标志
 	uint8_t	putS[60] = "jiangbo\r\n";
-    if (EXTI_GetITStatus(EXTI_Line0) != RESET)
+    if (EXTI_GetITStatus(EXTI_Line12) != RESET)
     {
         trace_printf("key down !!!!\n");
 		//COM_PutStr(COM1, putS);
-        EXTI_ClearITPendingBit(EXTI_Line0); //清除标志
+        EXTI_ClearITPendingBit(EXTI_Line12); //清除标志
     }
 }
-void initIMUINT()
+
+void SetupSleep(void);
+void ClearSleep(void);
+
+#ifndef BLUETOOTHTEST
+//CLRPWMCtrl *pwd = new CLRPWMCtrl();
+#endif
+void EXTI0_IRQHandler(void)
 {
 
+	int a = 100;
+	if (EXTI_GetITStatus(EXTI_Line0) != RESET){
+		trace_printf("button A on\n");
+		ExitSleepMode();
+		//SetupSleep();
+	  //__WFI();
+		//PWR_EnterSTOPMode(PWR_Regulator_LowPower,PWR_STOPEntry_WFI);
+		while(0){
+			if(a-- == 0){
+				break;
+			}
+			trace_printf(" a = %d\n", a);
+		}
+
+		EXTI_ClearITPendingBit(EXTI_Line0); //清除标志
+	}
+
+#if 0
+	static int isUp = 0;
+	char blueSendData[100] = {0};// = "AT+VERSION?\r\n";
+	if (EXTI_GetITStatus(EXTI_Line0) != RESET)
+	{
+		//trace_printf("key down IRQ0 !!!!\n");
+		if(isUp){
+			//ctrlIOUp();
+			//AT_Mode();
+			trace_printf("key down UP !!!!\n");
+		strcpy(blueSendData, "AT+ADCN?\r\n");
+		COM_PutStr(AT_COM, (uint8_t *)blueSendData);
+		}else{
+			//ctrlIODown();
+		//strcpy(blueSendData, "AT+BIND?\r\n");
+		//strcpy(blueSendData, "AT+ADCN?\r\n");
+		//COM_PutStr(AT_COM, (uint8_t *)blueSendData);
+
+		strcpy(blueSendData, "AT+STATE?\r\n");
+		COM_PutStr(AT_COM, (uint8_t *)blueSendData);
+			trace_printf("key down DOWN !!!!\n");
+		}
+
+
+		unsigned char send[20] = "nihao \r\n";
+
+		//COM_PutStr(COM1, send);
+		isUp = abs(isUp - 1);  //!isUp;
+		EXTI_ClearITPendingBit(EXTI_Line0); //清除标志
+	}
+#endif
 }
 
-void initCOM1(){
-	uint8_t buff[128];
-	strcpy((char*)&COM_INFO[COM1]->name, "COM1");
-	COM_INFO[COM1]->baudrate = 115200;
-	COM_INFO[COM1]->onoff = 1;
-	COM_INFO[COM1]->rxstatus = 0;
+void EXTI1_IRQHandler(void){
+	if (EXTI_GetITStatus(EXTI_Line1) != RESET){
+		trace_printf("button B on\n");
+		EXTI_ClearITPendingBit(EXTI_Line1); //清除标志
+	}
+}
 
-	COM_INFO[COM1]->rxnbr = 0;
-	COM_INFO[COM1]->rxsize = 128;//AT_RESP_SIZE;
-	COM_INFO[COM1]->rxbuf = buff;
+void blink_led_prems(int ms){
+	static bool led_on = true;
+	delay_ms(ms);
+	if(led_on){
+		blink_led_on();
+		//ctrlIOUp();
+	}
+	else{
 
-	COM_Init(COM1, 115200);
+		blink_led_off();
+		//ctrlIODown();
+	}
+	led_on = !led_on;
 
 }
 
-#if 1
+#ifdef TOUCHPADTEST
+int main(int argc, char* argv[])
+{
+	IFVRCtrlerInit();
+	Delay_Init();
+	blink_led_init();
+	trace_printf("start init pad\n");
+	CLRTouchpad *m_touchpad = new CLRTouchpad();
+	trace_printf("end init pad\n");
+
+	//CLRADC *m_adc = new CLRADC();
+	while(1)
+	{
+		blink_led_prems(50);
+		//trace_printf("adc = %d\n", m_adc->get_adc_value());
+		m_touchpad->run_loop();
+	}
+}
+#endif
+
+#ifdef BLUETOOTHTEST
+int main(int argc, char* argv[])
+{
+	//PWR_DeInit();
+	//SystemInit();
+	IFVRCtrlerInit();
+	Delay_Init();
+	blink_led_init();
+	//timer_start();
+	//CLRIRLed *ir = new CLRIRLed();
+	//ctrlIOUp();
+	IFVRCtrlerButton *button = new IFVRCtrlerButton();
+	//uint32_t loop = 0;
+	InitCOM1();
+	char usart1Puts[100] = {0};
+
+	BT_Init();
+	ATSetup();
+	//ATCheck();
+
+	//CLRIRLed *ifvrLed = new CLRIRLed();
+
+	bool led_on = true;
+
+	while(1){
+		//trace_printf("main loop\n");
+		//trace_printf("aaa == %d\n",button->getButtonA());
+		//trace_printf("bbb == %d\n",button->getButtonB());
+		/*
+		//进入休眠模式
+		if(button->getButtonB()){
+			trace_printf("get A\n");
+			EnterSleepMode();
+			__WFI();
+		}*/
+
+		//trace_printf(" Bluetooth state = %d\n", BTGetStatus());
+
+		//timer_sleep(TIMER_FREQUENCY_HZ/2);
+		delay_ms(50);
+		if(led_on){
+			blink_led_on();
+			//ctrlIOUp();
+		}
+		else{
+
+			blink_led_off();
+			//ctrlIODown();
+		}
+		led_on = !led_on;
+
+		if((COM_INFO[AT_COM]->rxstatus & 0x8000))
+		{
+			trace_printf("%s\n",COM_INFO[COM2]->rxbuf);
+			sprintf(usart1Puts,"%s\r\n",COM_INFO[COM2]->rxbuf);
+			COM_PutStr(COM1,(uint8_t *)usart1Puts);
+			COM_INFO[COM2]->rxstatus = 0;	//清除接收状态字
+			COM_INFO[COM2]->rxnbr = 0;		//清除数据接收计数值
+		} else {
+			//trace_printf("no get \n");
+		}
+
+/*
+		char sendChar[12];
+		trace_printf("will send\n");
+		sprintf(sendChar, "send=%d\r\n", loop++);
+		COM_PutStr(COM1, (uint8_t*)sendChar);
+		trace_printf("send %s \n", sendChar);
+*/
+		//delay_ms(  1000);
+/*
+		if((BT_LED == 1) && (COM_INFO[AT_COM]->rxstatus & 0x8000))
+		{
+			// Show COM gets
+			if(COM_INFO[AT_COM]->rxnbr > 16)//OLED一行最多显示16个字符
+				COM_INFO[AT_COM]->rxbuf[15] = '\0';//添加字符串结束符
+			else
+				COM_INFO[AT_COM]->rxbuf[COM_INFO[AT_COM]->rxnbr] = '\0';//添加字符串结束符
+
+			trace_printf("%s\n",COM_INFO[AT_COM]->rxbuf);
+
+			// Do something after info
+			//Check_and_SetLed();
+
+			// clear COM status
+			COM_INFO[AT_COM]->rxstatus = 0;	//清除接收状态字
+			COM_INFO[AT_COM]->rxnbr = 0;		//清除数据接收计数值
+
+		}
+		*/
+
+	}
+
+	return 0;
+}
+#endif
+
+
+//IR tracking
+#ifdef COMTEST
+int main(int argc, char* argv[])
+{
+	timer_start();
+	blink_led_init();
+	initCOM1();
+	bool led_on = true;
+	CLRIRLed *ir = new CLRIRLed();
+	uint8_t	putS[60] = "jiangbo\r\n";
+	uint8_t getS[60] = {0};
+	unsigned int loopCnt = 0;
+	pwd->run();
+	while(1){
+		timer_sleep(TIMER_FREQUENCY_HZ/2);
+		if(led_on)
+			blink_led_on();
+		else
+			blink_led_off();
+
+		sprintf((char *)putS,"jiangbo %d \r\n",loopCnt++);
+
+		COM_PutStr(COM1, putS);
+
+		//uint8_t a = COM_Get(COM1, (uint8_t *)getS, 100);
+		//trace_printf(" get data = %s \n", getS);
+
+		led_on = !led_on;
+
+	}
+
+}
+#endif
+
+#if 0
+void USART1_IRQHandler(void)
+{
+	trace_printf("in irq\n");
+	if(USART_GetITStatus(USART1, USART_IT_RXNE) != RESET)	//
+	{
+		trace_printf("!Reset\n");
+		USART_ClearITPendingBit(USART1, USART_IT_RXNE);
+	}
+}
+#endif
+#if 0
+//DMP6050 或者9250 目前不带地磁矫正
 int main(int argc, char* argv[])
 {
 	timer_start();
 	initCOM1();
 	CLRMPU6050DMP *mpu = new CLRMPU6050DMP();
-	mpu->setup();
-	uint8_t okk[20] = "ok!!!\r\n";
+	//CLRMPU9250 *mpu = new CLRMPU9250();
 	uint8_t Noo[20] = "no---\r\n";
-
 	uint8_t	putS[60] = {0};
 
-	int16_t q[4] = {0};
-	float sendQ[4] = {0};
+	float q[4] = {0};
 	while(1){
-
-		STOPWATCH_START;
 		if(mpu->loop(q)){
-
-			//COM_PutStr(COM1, okk);
-			sendQ[0] = (float)q[0] / 16384.0f;
-			sendQ[1] = (float)q[1] / 16384.0f;
-			sendQ[2] = (float)q[2] / 16384.0f;
-			sendQ[3] = (float)q[3] / 16384.0f;
-
-			//            Serial.print("quat\t");
-//            Serial.print(q.w);
-//            Serial.print("\t");
-//            Serial.print(q.x);
-//            Serial.print("\t");
-//            Serial.print(q.y);
-//            Serial.print("\t");
-//            Serial.println(q.z);
-
-			sprintf((char *)putS,"quat#%f#%f#%f#%f\r\n",sendQ[0],sendQ[1],sendQ[2],sendQ[3]);
-			STOPWATCH_STOP;
-			uint32_t timeDiff = CalcUsecondsFromStopwatch(m_nStart, m_nStop);
+			sprintf((char *)putS,"quat#%f#%f#%f#%f\r\n",q[0],q[1],q[2],q[3]);
 			COM_PutStr(COM1, putS);
-			sprintf((char *)putS,"time = %f\r\n",(float)timeDiff/(1000.0*1000.0));
-			COM_PutStr(COM1, putS);
-
 		}else{
 			COM_PutStr(COM1, Noo);
 		}
@@ -378,11 +550,12 @@ int main(int argc, char* argv[])
 		timer_sleep(TIMER_FREQUENCY_HZ/2);
 		//STOPWATCH_STOP;
 
-		STOPWATCH_START;
+		//STOPWATCH_START;
 		//dd = m_nStart - tempTime;
 		//float timeDiff = CalcUsecondsFromStopwatch(m_nStart, tempTime);
 		//tempTime = m_nStart;
-		tempTime = getMs(m_nStart);
+		//tempTime = getMs(m_nStart);
+		tempTime = getMs();
 		float timeDiff = tempTime - lastTime;
 		lastTime = tempTime;
 		//trace_printf("My function took %f seconds\n", (float)timeDiff/(1000.0*1000.0));
@@ -405,7 +578,6 @@ int main(int argc, char* argv[])
 		else
 			blink_led_off();
 		led_on = !led_on;
-
 
 		trace_puts("Hello ARM World!\n");
 	}
@@ -502,7 +674,7 @@ int main(int argc, char* argv[])
 		STOPWATCH_START;
 		//Now = t.read_us();
 		Now	= getUs(m_nStart);
-
+		//Now	= getUs();
 		deltat = (float)((Now - lastUpdate)/1000000.0f) ; // set integration time by time elapsed since last filter update
 		lastUpdate = Now;
 		//trace_printf("deltat = %f\n", deltat);
@@ -535,7 +707,8 @@ int main(int argc, char* argv[])
 		//led_on = !led_on;
 		trace_printf("Yaw, Pitch, Roll: %f %f %f\n", yaw, pitch, roll);
 		//sprintf((char *)putS,"%fp%fp%fpn\r",yaw,pitch,roll);
-		sprintf((char *)putS,"%fp%fp%fp%fpn\r",mpu9250->q[0],mpu9250->q[1],mpu9250->q[2],mpu9250->q[3]);
+		//sprintf((char *)putS,"%fp%fp%fp%fpn\r",mpu9250->q[0],mpu9250->q[1],mpu9250->q[2],mpu9250->q[3]);
+		sprintf((char *)putS,"quat#%f#%f#%f#%f\r\n",mpu9250->q[0],mpu9250->q[1],mpu9250->q[2],mpu9250->q[3]);
 		COM_PutStr(COM1, putS);
 
 		// Serial print and/or display at 0.5 s rate independent of data rates
@@ -699,63 +872,6 @@ int main(int argc, char* argv[])
 	}
 }
 #endif
-
-/*
- * timer
-int
-main(int argc, char* argv[])
-{
-	// Send a greeting to the trace device (skipped on Release).
-	trace_puts("Hello ARM World!");
-
-	// At this stage the system clock should have already been configured
-	// at high speed.
-	trace_printf("System clock: %u Hz\n", SystemCoreClock);
-
-	timer_start();
-
-	blink_led_init();
-
-	uint32_t seconds = 0;
-	int timeDiff = 0;
-
-	stopwatch_reset();
-
-	// Infinite loop
-	while (1)
-	{
-
-		blink_led_on();
-		STOPWATCH_START;
-		timer_sleep(seconds == 0 ? TIMER_FREQUENCY_HZ : BLINK_ON_TICKS);
-		STOPWATCH_STOP;
-
-		blink_led_off();
-		timer_sleep(BLINK_OFF_TICKS);
-
-
-		//blink_led_on();
-		//stopwatch_delay(SystemCoreClock);
-		timeDiff = CalcUsecondsFromStopwatch(m_nStart, m_nStop);
-		trace_printf("My function took %f seconds\n", (float)timeDiff/(1000.0*1000.0));
-		trace_printf(" m_nStart = %d\n", m_nStart);
-		trace_printf(" m_nStop  = %d\n", m_nStop);
-		trace_printf("My function took %d useconds\n", timeDiff);
-
-
-		//blink_led_off();
-		//stopwatch_delay(SystemCoreClock);
-
-
-		++seconds;
-
-		// Count seconds on the trace device.
-		trace_printf("Second %u\n", seconds);
-		//trace_printf("My function took %d nanoseconds\n", timeDiff);
-	}
-	// Infinite loop, never return.
-}
- */
 
 #pragma GCC diagnostic pop
 

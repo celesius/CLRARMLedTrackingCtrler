@@ -32,6 +32,11 @@
  
 #include "i2c.h"
 
+//#define I2C_SCL GPIOout(GPIOB, 8);	//SCL tsm12 pb8
+
+//#define I2C_SDA    GPIOout(GPIOB, 9)	//SDA tsm12 pb9
+//#define READ_SDA   GPIOin( GPIOB, 9)	//����SDA
+
 // I2C�����ٶ� = I2C_SPEED_1K / i2c_speed
 uint32_t	i2c_speed = I2C_SPEED_1K/100;
 
@@ -51,11 +56,20 @@ void I2C_Soft_Init(uint16_t speed)
 	RCC_APB2PeriphClockCmd(	RCC_APB2Periph_GPIOB, ENABLE );	
 	
 	//I2C��SDA��SCL����Ҫ��Ӳ���������������裬�����������Ϊ�������
+/*
 	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_10|GPIO_Pin_11;
 	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;	//��©���
 	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
 	GPIO_Init(GPIOB, &GPIO_InitStructure);
 	GPIO_SetBits(GPIOB,GPIO_Pin_10|GPIO_Pin_11);//�����������ó�ʼ��GPIO
+*/
+
+
+	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_8|GPIO_Pin_9;
+	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;	//��©���
+	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
+	GPIO_Init(GPIOB, &GPIO_InitStructure);
+	GPIO_SetBits(GPIOB,GPIO_Pin_8|GPIO_Pin_9);//�����������ó�ʼ��GPIO
 
 	//����SCL��SDA����״̬Ϊ�ߵ�ƽ
 	I2C_SCL = 1;
